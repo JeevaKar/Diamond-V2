@@ -9,9 +9,20 @@ vector<string> variables;
 vector<string> values;
 vector<string> stack;
 
+const string ADDITION_SIGN = "+";
+const string MINUS_SIGN = "-";
+const string MULTIPLICATION_SIGN = "*";
+const string DIVISION_SIGN = "/";
+const string EQUAL_SIGN = "=";
+const vector<string> KEYWORDS = {"out", "var"};
+
 void printvector(vector<string> vec);
-bool isNumber(const std::string s);
+bool isNumber(const string s);
+bool isKeyword(string word);
+
 void evaluate(vector<string> line);
+void output();
+void setVariable();
 
 int main () {
   // Create a text string, which is used to output the text file
@@ -56,8 +67,14 @@ int main () {
   MyReadFile.close();
   
   for (vector<string> line : code) {
+    stack = {};
     evaluate(line=line);
-    printvector(stack);
+    if (stack.front() == "out") {
+        output();
+    }
+    else if (stack.front() == "var") {
+        setVariable();
+    }
   }
 }
 
@@ -75,40 +92,130 @@ bool isNumber(const std::string s) {
 }
 
 void evaluate(vector<string> line) {
-    // int i = 0;
-    // for (string token) {
-    //     if (!token.empty() && token[0] == '"') {
-    //         i = i + 1;
-    //         continue;
-    //     }
-    //     else if (isNumber(token)) {
-    //         i = i + 1;
-    //         continue;
-    //     }
-    //     int j = 0;
-    //     for (string variable : variables) {
-    //         if (variable == token) {
-    //             stack[i] = values.at(j);
-    //         }
-    //         j = j + 1;
-    //     }
-    //     i = i + 1;
-    // }
     int i = 0;
     bool add = false;
+    bool subtract = false;
+    bool multiplication = false;
+    bool division = false;
     for (string token : line) {
-        stack.push_back(token);
-        string s = "+";
-        if (token == s) {
+        if (!token.empty() && (token[0] == '"' || isNumber(token) || isKeyword(token))) {
+            stack.push_back(token);
+        }
+        else if (line.front() != "var") {
+            int j = 0;
+            bool found = false;
+            for (string variable : variables) {
+                if (variable == token) {
+                    stack.push_back(values[j]);
+                    found = true;
+                    break;
+                }
+                j = j + 1;
+            }
+            if (!found) {
+                cout << "Error, variable not found!";
+                abort();
+            }
+        }
+        else if (line.front() == "var" && i == 1) {
+            stack.push_back(token);
+        }
+        else {
+            cout << "Token: " << token << ", not recognized!";
+            abort();
+        }
+
+
+        if (token == ADDITION_SIGN) {
             add = true;
             stack.pop_back();
         }
+        else if (token == MINUS_SIGN) {
+            subtract = true;
+            stack.pop_back();
+        }
+        if (token == MULTIPLICATION_SIGN) {
+            multiplication = true;
+            stack.pop_back();
+        }
+        else if (token == DIVISION_SIGN) {
+            division = true;
+            stack.pop_back();
+        }
+
         else if (add == true) {
             float rhs = stof(stack.back());
             stack.pop_back();
             float lhs = stof(stack.back());
             stack.pop_back();
-            stack.push_back(to_string(rhs+lhs));
+            stack.push_back(to_string(lhs+rhs));
         }
+        else if (subtract == true) {
+            float rhs = stof(stack.back());
+            stack.pop_back();
+            float lhs = stof(stack.back());
+            stack.pop_back();
+            stack.push_back(to_string(lhs-rhs));
+        }
+        else if (multiplication == true) {
+            float rhs = stof(stack.back());
+            stack.pop_back();
+            float lhs = stof(stack.back());
+            stack.pop_back();
+            stack.push_back(to_string(lhs*rhs));
+        }
+        else if (division == true) {
+            float rhs = stof(stack.back());
+            stack.pop_back();
+            float lhs = stof(stack.back());
+            stack.pop_back();
+            stack.push_back(to_string(lhs/rhs));
+        }
+
+        i = i + 1;
+    }
+}
+
+bool isKeyword(string word) {
+    for (string keyword: KEYWORDS) {
+        if (word == keyword) {
+            return true;
+        }
+    }
+    if (word == ADDITION_SIGN || word == MINUS_SIGN || word == DIVISION_SIGN || word == MULTIPLICATION_SIGN || word == EQUAL_SIGN) {
+        return true;
+    }
+    return false;
+}
+
+void output() {
+    int i = 1;
+    while (i < stack.size()) {
+        if (i != (stack.size()-1)) {
+            cout << i << " ";
+        }
+        else {
+            cout << stack.at(i);
+        }
+        i = i + 1;
+    }
+}
+
+void setVariable() {
+    int i = 0;
+    bool exists = false;
+    for (string variable: variables) {
+        if (variable == stack.at(1)) {
+            exists = true;
+            break;
+        }
+        i = i + 1;
+    }
+    if (exists) {
+        values[i] = stack.at(2);
+    }
+    else {
+        variables.push_back(stack.at(1));
+        values.push_back(stack.at(2));
     }
 }
