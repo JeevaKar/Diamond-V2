@@ -101,7 +101,10 @@ void evaluate(vector<string> line) {
         if (!token.empty() && (token[0] == '"' || isNumber(token) || isKeyword(token))) {
             stack.push_back(token);
         }
-        else if (line.front() != "var") {
+        else if (line.front() == "var" && i == 1) {
+            stack.push_back(token);
+        }
+        else {
             int j = 0;
             bool found = false;
             for (string variable : variables) {
@@ -113,18 +116,10 @@ void evaluate(vector<string> line) {
                 j = j + 1;
             }
             if (!found) {
-                cout << "Error, variable not found!";
+                cout << "Error, variable/keyword " << token << " not found!";
                 abort();
             }
         }
-        else if (line.front() == "var" && i == 1) {
-            stack.push_back(token);
-        }
-        else {
-            cout << "Token: " << token << ", not recognized!";
-            abort();
-        }
-
 
         if (token == ADDITION_SIGN) {
             add = true;
@@ -191,11 +186,27 @@ bool isKeyword(string word) {
 void output() {
     int i = 1;
     while (i < stack.size()) {
-        if (i != (stack.size()-1)) {
-            cout << i << " ";
+        bool backslash = false;
+        for (char letter : stack.at(i)) {
+            if (letter == '"') {}
+            else if (backslash) {
+                if (letter == 'n') {
+                    cout << "\n";
+                }
+                else if (letter == '\\') {
+                    cout << "\\";
+                }
+                backslash = false;
+            }
+            else if (letter == '\\') {
+                backslash = true;
+            }
+            else {
+                cout << letter;
+            }
         }
-        else {
-            cout << stack.at(i);
+        if (i != (stack.size()-1)) {
+            cout << " ";
         }
         i = i + 1;
     }
