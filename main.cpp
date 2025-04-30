@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <cstdlib>
 using namespace std;
 
 vector<string> variables;
@@ -29,9 +30,14 @@ int main () {
   vector<vector<string>> code;
   vector<string> line;
   string text;
+  string filename;
+
+  cout << "Enter a filename:";
+  cin >> filename;
 
   // Read from the text file
-  ifstream MyReadFile("main.di");
+  ifstream MyReadFile(filename);
+  system("cls");
 
   // Use a while loop together with the getline() function to read the file line by line
   while (getline (MyReadFile, text)) {
