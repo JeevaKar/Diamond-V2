@@ -192,16 +192,16 @@ core evaluate(vector<string> line, core inputCore) {
         if (!token.empty() && (token[0] == '"' || helperfunctions::isNumber(token) || helperfunctions::isKeyword(token))) {
             inputCore.stack.push_back(token);
         }
-        else if (!token.empty() && line.front() == "var" && inputCore.stack.size() == 1) {
+        else if (!token.empty() && inputCore.stack.front() == "var" && inputCore.stack.size() == 1) {
             inputCore.stack.push_back(token);
         }
-        else if (!token.empty() && line.front() == "label" && inputCore.stack.size() == 1) {
+        else if (!token.empty() && inputCore.stack.front() == "label" && inputCore.stack.size() == 1) {
             inputCore.stack.push_back(token);
         }
-        else if (!token.empty() && line.front() == "if" && inputCore.stack.size() == 1){
+        else if (!token.empty() && inputCore.stack.front() == "if" && inputCore.stack.size() == 1){
             inputCore.stack.push_back(token);
         }
-        else if (!token.empty() && line.front() == "endif" && inputCore.stack.size() == 1){
+        else if (!token.empty() && inputCore.stack.front() == "endif" && inputCore.stack.size() == 1){
             inputCore.stack.push_back(token);
         }
         else if (!token.empty()) {
