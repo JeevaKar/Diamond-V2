@@ -4,7 +4,7 @@ out x
 out "\n"
 if a x < 20
 var x x + 2
-jump start
+    jump start
 else a
-out "Done"
+    out "Done"
 endif a

@@ -30,6 +30,7 @@ bool globalProgramCounterChanged = false;
 void printvector(vector<string> vec);
 bool isNumber(const string s);
 bool isKeyword(string word);
+string strip(string token);
 
 core execute(vector<vector<string>> code, core mainCore, int start);
 core evaluate(vector<string> line, core inputCore);
@@ -93,14 +94,6 @@ core execute(vector<vector<string>> code, core mainCore, int start) {
     int programCounter = 0;
     int end = start + code.size() - 1;
     while (programCounter < code.size() && !globalProgramCounterChanged) {
-        // if (globalProgramCounterChanged && (globalProgramCounter >= start) && (globalProgramCounter <= end)) {
-        //     cout << "PROGRAM COUNTER:" << programCounter << "\n";
-        //     programCounter = globalProgramCounter;
-        //     globalProgramCounterChanged = false;
-        // }
-        if (globalProgramCounterChanged) {
-            cout << "YAY!";
-        }
         vector<string> line = code.at(programCounter);
         mainCore.stack = {};
         mainCore = evaluate(line, mainCore);
@@ -157,6 +150,16 @@ bool isNumber(const std::string s) {
     return (iss >> f) && (iss.eof());
 }
 
+string strip(string token) {
+    string strippedToken;
+    for (char letter : token) {
+        if (!::isspace(letter)) {
+            strippedToken.push_back(letter);
+        }
+    }
+    return strippedToken;
+}
+
 core evaluate(vector<string> line, core inputCore) {
     int i = 0;
     bool add = false;
@@ -171,22 +174,23 @@ core evaluate(vector<string> line, core inputCore) {
     bool equalEqual = false;
 
     for (string token : line) {
+        token = strip(token);
         if (!token.empty() && (token[0] == '"' || isNumber(token) || isKeyword(token))) {
             inputCore.stack.push_back(token);
         }
-        else if (line.front() == "var" && i == 1) {
+        else if (!token.empty() && line.front() == "var" && inputCore.stack.size() == 1) {
             inputCore.stack.push_back(token);
         }
-        else if (line.front() == "label" && i == 1) {
+        else if (!token.empty() && line.front() == "label" && inputCore.stack.size() == 1) {
             inputCore.stack.push_back(token);
         }
-        else if (line.front() == "if" && i == 1){
+        else if (!token.empty() && line.front() == "if" && inputCore.stack.size() == 1){
             inputCore.stack.push_back(token);
         }
-        else if (line.front() == "endif" && i == 1){
+        else if (!token.empty() && line.front() == "endif" && inputCore.stack.size() == 1){
             inputCore.stack.push_back(token);
         }
-        else {
+        else if (!token.empty()) {
             int j = 0;
             bool found = false;
             for (string variable : inputCore.variables) {
@@ -343,7 +347,7 @@ core evaluate(vector<string> line, core inputCore) {
             }
             greaterThanEqual = false;
         }
-
+        
         i++;
     }
     return inputCore;
