@@ -6,24 +6,38 @@
 #include <cstdlib>
 using namespace std;
 
-vector<string> variables;
-vector<string> values;
-vector<string> stack;
+struct core {
+    vector<string> variables;
+    vector<string> values;
+    vector<string> stack;
+    vector<string> label;
+    vector<int> lineNumber;
+    string returnString;
+};
 
 const string ADDITION_SIGN = "+";
 const string MINUS_SIGN = "-";
 const string MULTIPLICATION_SIGN = "*";
 const string DIVISION_SIGN = "/";
 const string EQUAL_SIGN = "=";
-const vector<string> KEYWORDS = {"out", "var"};
+const string GREATER_THAN_SIGN = ">";
+const string LESS_THAN_SIGN = "<";
+const vector<string> KEYWORDS = {"out", "var", "clear", "label", "jump", "True", "False", "if", "endif", "else"};
+
+int globalProgramCounter = 0;
+bool globalProgramCounterChanged = false;
 
 void printvector(vector<string> vec);
 bool isNumber(const string s);
 bool isKeyword(string word);
 
-void evaluate(vector<string> line);
-void output();
-void setVariable();
+core execute(vector<vector<string>> code, core mainCore, int start);
+core evaluate(vector<string> line, core inputCore);
+void output(core inputCore);
+core setVariable(core inputCore);
+core createLabel(core inputCore, int lineNumber);
+void jump(core inputCore);
+core ifStatement(vector<vector<string>> code, int lineNumber, core inputCore);
 
 int main () {
   // Create a text string, which is used to output the text file
@@ -71,23 +85,69 @@ int main () {
   }
 
   MyReadFile.close();
-  
-  for (vector<string> line : code) {
-    stack = {};
-    evaluate(line=line);
-    if (stack.front() == "out") {
-        output();
+  core mainCore;
+  execute(code, mainCore, 0);
+}
+
+core execute(vector<vector<string>> code, core mainCore, int start) {
+    int programCounter = 0;
+    int end = start + code.size() - 1;
+    while (programCounter < code.size() && !globalProgramCounterChanged) {
+        // if (globalProgramCounterChanged && (globalProgramCounter >= start) && (globalProgramCounter <= end)) {
+        //     cout << "PROGRAM COUNTER:" << programCounter << "\n";
+        //     programCounter = globalProgramCounter;
+        //     globalProgramCounterChanged = false;
+        // }
+        if (globalProgramCounterChanged) {
+            cout << "YAY!";
+        }
+        vector<string> line = code.at(programCounter);
+        mainCore.stack = {};
+        mainCore = evaluate(line, mainCore);
+        if (mainCore.stack.front() == "out") {
+            output(mainCore);
+        }
+        else if (mainCore.stack.front() == "var") {
+            mainCore = setVariable(mainCore);
+        }
+        else if (mainCore.stack.front() == "clear") {
+            system("cls");
+        }
+        else if (mainCore.stack.front() == "label") {
+            mainCore = createLabel(mainCore, programCounter);
+        }
+        else if (mainCore.stack.front() == "jump") {
+            jump(mainCore);
+        }
+        else if (mainCore.stack.front() == "if") {
+            mainCore = ifStatement(code, programCounter, mainCore);
+            programCounter = stof(mainCore.returnString)-1;
+        }
+        
+        if (globalProgramCounterChanged && (globalProgramCounter >= start) && (globalProgramCounter <= end)) {
+            programCounter = globalProgramCounter;
+            globalProgramCounter = 0;
+            globalProgramCounterChanged = false;
+        }
+        else {
+            programCounter++;
+        }
     }
-    else if (stack.front() == "var") {
-        setVariable();
-    }
-  }
+    return mainCore;
 }
 
 void printvector(vector<string> vec) {
     for (string item : vec) {
         cout << item << ", ";
     }
+    cout << "\n";
+}
+
+void printvector(vector<int> vec) {
+    for (int item : vec) {
+        cout << item << ", ";
+    }
+    cout << "\n";
 }
 
 bool isNumber(const std::string s) {
@@ -97,29 +157,54 @@ bool isNumber(const std::string s) {
     return (iss >> f) && (iss.eof());
 }
 
-void evaluate(vector<string> line) {
+core evaluate(vector<string> line, core inputCore) {
     int i = 0;
     bool add = false;
     bool subtract = false;
     bool multiplication = false;
     bool division = false;
+    bool equal = false;
+    bool lessThan = false;
+    bool greaterThan = false;
+    bool lessThanEqual = false;
+    bool greaterThanEqual = false;
+    bool equalEqual = false;
+
     for (string token : line) {
         if (!token.empty() && (token[0] == '"' || isNumber(token) || isKeyword(token))) {
-            stack.push_back(token);
+            inputCore.stack.push_back(token);
         }
         else if (line.front() == "var" && i == 1) {
-            stack.push_back(token);
+            inputCore.stack.push_back(token);
+        }
+        else if (line.front() == "label" && i == 1) {
+            inputCore.stack.push_back(token);
+        }
+        else if (line.front() == "if" && i == 1){
+            inputCore.stack.push_back(token);
+        }
+        else if (line.front() == "endif" && i == 1){
+            inputCore.stack.push_back(token);
         }
         else {
             int j = 0;
             bool found = false;
-            for (string variable : variables) {
+            for (string variable : inputCore.variables) {
                 if (variable == token) {
-                    stack.push_back(values[j]);
+                    inputCore.stack.push_back(inputCore.values[j]);
                     found = true;
                     break;
                 }
                 j = j + 1;
+            }
+            if (!found) {
+                for (string label : inputCore.label) {
+                    if (label == token) {
+                        inputCore.stack.push_back(token);
+                        found = true;
+                        break;
+                    }
+                }
             }
             if (!found) {
                 cout << "Error, variable/keyword " << token << " not found!";
@@ -129,52 +214,139 @@ void evaluate(vector<string> line) {
 
         if (token == ADDITION_SIGN) {
             add = true;
-            stack.pop_back();
+            inputCore.stack.pop_back();
         }
         else if (token == MINUS_SIGN) {
             subtract = true;
-            stack.pop_back();
+            inputCore.stack.pop_back();
         }
-        if (token == MULTIPLICATION_SIGN) {
+        else if (token == MULTIPLICATION_SIGN) {
             multiplication = true;
-            stack.pop_back();
+            inputCore.stack.pop_back();
         }
         else if (token == DIVISION_SIGN) {
             division = true;
-            stack.pop_back();
+            inputCore.stack.pop_back();
+        }
+        else if (token == EQUAL_SIGN) {
+            if (equal) {
+                equalEqual = true;
+                equal = false;
+            }
+            else if (!equal) {
+                equal = true;
+            }
+            inputCore.stack.pop_back();
+        }
+        else if (token == GREATER_THAN_SIGN) {
+            if (equal) {
+                greaterThanEqual = true;
+                equal = false;
+            }
+            else if (!equal) {
+                greaterThan = true;
+            }
+            inputCore.stack.pop_back();
+        }
+        else if (token == LESS_THAN_SIGN) {
+            if (equal) {
+                lessThanEqual = true;
+                equal = false;
+            }
+            else if (!equal) {
+                lessThan = true;
+            }
+            inputCore.stack.pop_back();
         }
 
-        else if (add == true) {
-            float rhs = stof(stack.back());
-            stack.pop_back();
-            float lhs = stof(stack.back());
-            stack.pop_back();
-            stack.push_back(to_string(lhs+rhs));
+        else if (add) {
+            float rhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            float lhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            inputCore.stack.push_back(to_string(lhs+rhs));
+            add = false;
         }
-        else if (subtract == true) {
-            float rhs = stof(stack.back());
-            stack.pop_back();
-            float lhs = stof(stack.back());
-            stack.pop_back();
-            stack.push_back(to_string(lhs-rhs));
+        else if (subtract) {
+            float rhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            float lhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            inputCore.stack.push_back(to_string(lhs-rhs));
+            subtract = false;
         }
-        else if (multiplication == true) {
-            float rhs = stof(stack.back());
-            stack.pop_back();
-            float lhs = stof(stack.back());
-            stack.pop_back();
-            stack.push_back(to_string(lhs*rhs));
+        else if (multiplication) {
+            float rhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            float lhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            inputCore.stack.push_back(to_string(lhs*rhs));
+            multiplication = false;
         }
-        else if (division == true) {
-            float rhs = stof(stack.back());
-            stack.pop_back();
-            float lhs = stof(stack.back());
-            stack.pop_back();
-            stack.push_back(to_string(lhs/rhs));
+        else if (division) {
+            float rhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            float lhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            inputCore.stack.push_back(to_string(lhs/rhs));
+            division = false;
+        }
+        else if (lessThan) {
+            float rhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            float lhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            if (lhs<rhs) {
+                inputCore.stack.push_back("True");
+            }
+            else {
+                inputCore.stack.push_back("False");
+            }
+            lessThan = false;
+        }
+        else if (greaterThan) {
+            float rhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            float lhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            if (lhs>rhs) {
+                inputCore.stack.push_back("True");
+            }
+            else {
+                inputCore.stack.push_back("False");
+            }
+            greaterThan = false;
+        }
+        else if (lessThanEqual) {
+            float rhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            float lhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            if (lhs <= rhs) {
+                inputCore.stack.push_back("True");
+            }
+            else {
+                inputCore.stack.push_back("False");
+            }
+            lessThanEqual = false;
+        }
+        else if (greaterThanEqual) {
+            float rhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            float lhs = stof(inputCore.stack.back());
+            inputCore.stack.pop_back();
+            if (lhs>=rhs){
+                inputCore.stack.push_back("True");
+            }
+            else {
+                inputCore.stack.push_back("False");
+            }
+            greaterThanEqual = false;
         }
 
-        i = i + 1;
+        i++;
     }
+    return inputCore;
 }
 
 bool isKeyword(string word) {
@@ -183,17 +355,20 @@ bool isKeyword(string word) {
             return true;
         }
     }
-    if (word == ADDITION_SIGN || word == MINUS_SIGN || word == DIVISION_SIGN || word == MULTIPLICATION_SIGN || word == EQUAL_SIGN) {
+    if (word == ADDITION_SIGN || word == MINUS_SIGN || word == DIVISION_SIGN || word == MULTIPLICATION_SIGN) {
+        return true;
+    }
+    if (word == EQUAL_SIGN || word == GREATER_THAN_SIGN || word == LESS_THAN_SIGN) {
         return true;
     }
     return false;
 }
 
-void output() {
+void output(core inputCore) {
     int i = 1;
-    while (i < stack.size()) {
+    while (i < inputCore.stack.size()) {
         bool backslash = false;
-        for (char letter : stack.at(i)) {
+        for (char letter : inputCore.stack.at(i)) {
             if (letter == '"') {}
             else if (backslash) {
                 if (letter == 'n') {
@@ -211,28 +386,104 @@ void output() {
                 cout << letter;
             }
         }
-        if (i != (stack.size()-1)) {
+        if (i != (inputCore.stack.size()-1)) {
             cout << " ";
         }
         i = i + 1;
     }
 }
 
-void setVariable() {
+core setVariable(core inputCore) {
     int i = 0;
     bool exists = false;
-    for (string variable: variables) {
-        if (variable == stack.at(1)) {
+    for (string variable: inputCore.variables) {
+        if (variable == inputCore.stack.at(1)) {
             exists = true;
             break;
         }
         i = i + 1;
     }
     if (exists) {
-        values[i] = stack.at(2);
+        inputCore.values[i] = inputCore.stack.at(2);
     }
     else {
-        variables.push_back(stack.at(1));
-        values.push_back(stack.at(2));
+        inputCore.variables.push_back(inputCore.stack.at(1));
+        inputCore.values.push_back(inputCore.stack.at(2));
     }
+    return inputCore;
+}
+
+core createLabel(core inputCore, int lineNumber) {
+    int i = 0;
+    for (string label : inputCore.label) {
+        if (label == inputCore.stack.at(1)) {
+            inputCore.lineNumber[i] = lineNumber;
+            return inputCore;
+        }
+        i++;
+    }
+    inputCore.label.push_back(inputCore.stack.at(1));
+    inputCore.lineNumber.push_back(lineNumber);
+    return inputCore;
+}
+
+void jump(core inputCore) {
+    string labelName = inputCore.stack.at(1);
+    int i = 0;
+    bool labelExists = false;
+    for (string label : inputCore.label) {
+        if (label == labelName) {
+            globalProgramCounter = inputCore.lineNumber.at(i)+1;
+            globalProgramCounterChanged = true;
+            labelExists = true;
+            break;
+        }
+        i++;
+    }
+    if (!labelExists) {
+        cout << "Error, label " << labelName << " not found.";
+        abort();
+    }
+}
+
+core ifStatement(vector<vector<string>> code, int lineNumber, core inputCore) {
+    vector<vector<string>> ifcode;
+    vector<vector<string>> elsecode;
+    bool elseStatement = false;
+    bool flag = false;
+    vector<int> lineNumbers;
+    lineNumber ++;
+    lineNumbers.push_back(lineNumber);
+    while ((lineNumber < code.size()) && (!flag)) {
+        vector<string> line = code.at(lineNumber);
+        if (line.front() == "else" && line.back() == inputCore.stack.at(1)) {
+            elseStatement = true;
+            lineNumbers.push_back(lineNumber+1);
+        }
+        else if (line.front() == "endif" && line.back() == inputCore.stack.at(1)) {
+            flag = true;
+            lineNumbers.push_back(lineNumber+1);
+        }
+        else {
+            if (!elseStatement) {
+                ifcode.push_back(line);
+            }
+            else {
+                elsecode.push_back(line);
+            }
+        }
+        lineNumber ++;
+    }
+    if (!flag) {
+        cout << "End if statement not found!";
+        abort();
+    }
+    else if (inputCore.stack.at(2) == "True") {
+        inputCore = execute(ifcode, inputCore, lineNumbers.front());
+    }
+    else if (elseStatement) {
+        inputCore = execute(elsecode, inputCore, lineNumbers.at(1));
+    }
+    inputCore.returnString = to_string(lineNumbers.back());
+    return inputCore;
 }
