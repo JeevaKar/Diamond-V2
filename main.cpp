@@ -14,23 +14,68 @@ struct core {
     vector<int> lineNumber;
     string returnString;
 };
+struct keyTokens {
+    const string ADDITION_SIGN = "+";
+    const string MINUS_SIGN = "-";
+    const string MULTIPLICATION_SIGN = "*";
+    const string DIVISION_SIGN = "/";
+    const string EQUAL_SIGN = "=";
+    const string GREATER_THAN_SIGN = ">";
+    const string LESS_THAN_SIGN = "<";
+    const vector<string> KEYWORDS = {"out", "var", "clear", "label", "jump", "True", "False", "if", "endif", "else"};
+};
+namespace helperfunctions {
+    keyTokens reservedKeywords;
+    void printvector(vector<string> vec) {
+        for (string item : vec) {
+            cout << item << ", ";
+        }
+        cout << "\n";
+    }
+    
+    void printvector(vector<int> vec) {
+        for (int item : vec) {
+            cout << item << ", ";
+        }
+        cout << "\n";
+    }
 
-const string ADDITION_SIGN = "+";
-const string MINUS_SIGN = "-";
-const string MULTIPLICATION_SIGN = "*";
-const string DIVISION_SIGN = "/";
-const string EQUAL_SIGN = "=";
-const string GREATER_THAN_SIGN = ">";
-const string LESS_THAN_SIGN = "<";
-const vector<string> KEYWORDS = {"out", "var", "clear", "label", "jump", "True", "False", "if", "endif", "else"};
+    bool isNumber(const std::string s) {
+        std::istringstream iss(s);
+        float f;
+        // Try to parse the string as a float and ensure there's no leftover content
+        return (iss >> f) && (iss.eof());
+    }
+
+    bool isKeyword(string word) {
+        for (string keyword: reservedKeywords.KEYWORDS) {
+            if (word == keyword) {
+                return true;
+            }
+        }
+        if (word == reservedKeywords.ADDITION_SIGN || word == reservedKeywords.MINUS_SIGN || word == reservedKeywords.DIVISION_SIGN || word == reservedKeywords.MULTIPLICATION_SIGN) {
+            return true;
+        }
+        if (word == reservedKeywords.EQUAL_SIGN || word == reservedKeywords.GREATER_THAN_SIGN || word == reservedKeywords.LESS_THAN_SIGN) {
+            return true;
+        }
+        return false;
+    }
+
+    string strip(string token) {
+        string strippedToken;
+        for (char letter : token) {
+            if (!::isspace(letter)) {
+                strippedToken.push_back(letter);
+            }
+        }
+        return strippedToken;
+    }
+}
 
 int globalProgramCounter = 0;
 bool globalProgramCounterChanged = false;
-
-void printvector(vector<string> vec);
-bool isNumber(const string s);
-bool isKeyword(string word);
-string strip(string token);
+keyTokens reservedKeywords;
 
 core execute(vector<vector<string>> code, core mainCore, int start);
 core evaluate(vector<string> line, core inputCore);
@@ -129,37 +174,6 @@ core execute(vector<vector<string>> code, core mainCore, int start) {
     return mainCore;
 }
 
-void printvector(vector<string> vec) {
-    for (string item : vec) {
-        cout << item << ", ";
-    }
-    cout << "\n";
-}
-
-void printvector(vector<int> vec) {
-    for (int item : vec) {
-        cout << item << ", ";
-    }
-    cout << "\n";
-}
-
-bool isNumber(const std::string s) {
-    std::istringstream iss(s);
-    float f;
-    // Try to parse the string as a float and ensure there's no leftover content
-    return (iss >> f) && (iss.eof());
-}
-
-string strip(string token) {
-    string strippedToken;
-    for (char letter : token) {
-        if (!::isspace(letter)) {
-            strippedToken.push_back(letter);
-        }
-    }
-    return strippedToken;
-}
-
 core evaluate(vector<string> line, core inputCore) {
     int i = 0;
     bool add = false;
@@ -174,8 +188,8 @@ core evaluate(vector<string> line, core inputCore) {
     bool equalEqual = false;
 
     for (string token : line) {
-        token = strip(token);
-        if (!token.empty() && (token[0] == '"' || isNumber(token) || isKeyword(token))) {
+        token = helperfunctions::strip(token);
+        if (!token.empty() && (token[0] == '"' || helperfunctions::isNumber(token) || helperfunctions::isKeyword(token))) {
             inputCore.stack.push_back(token);
         }
         else if (!token.empty() && line.front() == "var" && inputCore.stack.size() == 1) {
@@ -216,23 +230,23 @@ core evaluate(vector<string> line, core inputCore) {
             }
         }
 
-        if (token == ADDITION_SIGN) {
+        if (token == reservedKeywords.ADDITION_SIGN) {
             add = true;
             inputCore.stack.pop_back();
         }
-        else if (token == MINUS_SIGN) {
+        else if (token == reservedKeywords.MINUS_SIGN) {
             subtract = true;
             inputCore.stack.pop_back();
         }
-        else if (token == MULTIPLICATION_SIGN) {
+        else if (token == reservedKeywords.MULTIPLICATION_SIGN) {
             multiplication = true;
             inputCore.stack.pop_back();
         }
-        else if (token == DIVISION_SIGN) {
+        else if (token == reservedKeywords.DIVISION_SIGN) {
             division = true;
             inputCore.stack.pop_back();
         }
-        else if (token == EQUAL_SIGN) {
+        else if (token == reservedKeywords.EQUAL_SIGN) {
             if (equal) {
                 equalEqual = true;
                 equal = false;
@@ -242,7 +256,7 @@ core evaluate(vector<string> line, core inputCore) {
             }
             inputCore.stack.pop_back();
         }
-        else if (token == GREATER_THAN_SIGN) {
+        else if (token == reservedKeywords.GREATER_THAN_SIGN) {
             if (equal) {
                 greaterThanEqual = true;
                 equal = false;
@@ -252,7 +266,7 @@ core evaluate(vector<string> line, core inputCore) {
             }
             inputCore.stack.pop_back();
         }
-        else if (token == LESS_THAN_SIGN) {
+        else if (token == reservedKeywords.LESS_THAN_SIGN) {
             if (equal) {
                 lessThanEqual = true;
                 equal = false;
@@ -351,21 +365,6 @@ core evaluate(vector<string> line, core inputCore) {
         i++;
     }
     return inputCore;
-}
-
-bool isKeyword(string word) {
-    for (string keyword: KEYWORDS) {
-        if (word == keyword) {
-            return true;
-        }
-    }
-    if (word == ADDITION_SIGN || word == MINUS_SIGN || word == DIVISION_SIGN || word == MULTIPLICATION_SIGN) {
-        return true;
-    }
-    if (word == EQUAL_SIGN || word == GREATER_THAN_SIGN || word == LESS_THAN_SIGN) {
-        return true;
-    }
-    return false;
 }
 
 void output(core inputCore) {
