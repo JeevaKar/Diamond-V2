@@ -200,7 +200,7 @@ core execute(vector<vector<string>> code, core mainCore, int start) {
 		}
 		// Declaring a label
 		else if (mainCore.stack.front() == "label") {
-			mainCore = createLabel(mainCore, programCounter);
+			mainCore = createLabel(mainCore, (programCounter+start));
 		}
 		// Jumping to a label
 		else if (mainCore.stack.front() == "jump") {
@@ -208,7 +208,7 @@ core execute(vector<vector<string>> code, core mainCore, int start) {
 		}
 		// If statements
 		else if (mainCore.stack.front() == "if") {
-			mainCore = ifStatement(code, programCounter, mainCore);
+			mainCore = ifStatement(code, programCounter+start, mainCore);
 			programCounter = stof(mainCore.returnString)-1;
 		}
 		
@@ -501,9 +501,8 @@ void output(core inputCore) {
 core setVariable(core inputCore) {
 	int i = 0; // List index
 	bool exists = false; // FLAG - Raised if the variable already exists
-	///////////////////////////////////////
-	// TODO: COMMENT FROM HERE DOWNWARDS //
-	///////////////////////////////////////
+	
+	// Seaches through variables to check if it exists
 	for (string variable: inputCore.variables) {
 		if (variable == inputCore.stack.at(1)) {
 			exists = true;
@@ -511,9 +510,12 @@ core setVariable(core inputCore) {
 		}
 		i = i + 1;
 	}
+
+	// Changes the variable value if it exists
 	if (exists) {
 		inputCore.values[i] = inputCore.stack.at(2);
 	}
+	// Creates a new variable if the variable doesn't yet exist
 	else {
 		inputCore.variables.push_back(inputCore.stack.at(1));
 		inputCore.values.push_back(inputCore.stack.at(2));
@@ -521,25 +523,45 @@ core setVariable(core inputCore) {
 	return inputCore;
 }
 
+/**
+ * Sets/changes label locations
+ * 
+ * @param inputCore Uses the `inputCore.stack` to modify `inputCore.label` and `inputCore.lineNumber`
+ * @param lineNumber Uses the current `lineNumber` to set the line number that the label corresponds to
+ * 
+ * @return Returns a modified core with updated `inputCore.label` and `inputCore.lineNumber`
+ */
 core createLabel(core inputCore, int lineNumber) {
-	int i = 0;
+	int i = 0; // List index
+
+	// Checks if the label name already exists
 	for (string label : inputCore.label) {
+		// If the label exists, update the label's corresponding line number, and return the core
 		if (label == inputCore.stack.at(1)) {
 			inputCore.lineNumber[i] = lineNumber;
 			return inputCore;
 		}
 		i++;
 	}
+	// If the label doesn't already exist, create a new one
 	inputCore.label.push_back(inputCore.stack.at(1));
 	inputCore.lineNumber.push_back(lineNumber);
 	return inputCore;
 }
 
+/**
+ * Handles jumping functionality, where the program jumps to a label
+ * 
+ * @param inputCore `inputCore.stack` is interpreted to find the line number to jump to from `inputCore.lineNumber`
+ */
 void jump(core inputCore) {
-	string labelName = inputCore.stack.at(1);
-	int i = 0;
-	bool labelExists = false;
+	const string labelName = inputCore.stack.at(1); // Name of the label
+	int i = 0; // Loop index
+	bool labelExists = false; // FLAG - Raised if the label is found
+
+	// Loops through all of the labels to find the correct label being referenced
 	for (string label : inputCore.label) {
+		// If the label exists, raise the flag that the label exists, and set the value to jump to
 		if (label == labelName) {
 			globalProgramCounter = inputCore.lineNumber.at(i)+1;
 			globalProgramCounterChanged = true;
@@ -548,30 +570,60 @@ void jump(core inputCore) {
 		}
 		i++;
 	}
+	
+	// If the label doesn't exist, then return an error
 	if (!labelExists) {
 		cout << "Error, label " << labelName << " not found.";
 		abort();
 	}
 }
 
+/**
+ * Handles the execution of if and else statements
+ * 
+ * @param code Runs through the entire codebase to see where the if statement ends
+ * @param lineNumber Current line number
+ * @param inputCore Uses the stack to judge whether or not the if statment is true
+ * 
+ * @return Returns a modified inputcore, changed by the new scope that it spins off to
+ */
 core ifStatement(vector<vector<string>> code, int lineNumber, core inputCore) {
-	vector<vector<string>> ifcode;
-	vector<vector<string>> elsecode;
-	bool elseStatement = false;
-	bool flag = false;
-	vector<int> lineNumbers;
+	vector<vector<string>> ifcode; // Stores code that would be executed under the if clause
+	vector<vector<string>> elsecode; // Stores code that would executed under the else clause
+	bool elseStatement = false; // FLAG - Raised if an else statement is found
+	bool endifStatement = false; // FLAG - Raised when the endif statement is found
+	vector<int> lineNumbers; // Stores the line number of the if, else, and endif lines
+	
+	// Increments the pushes to `lineNumbers` the `lineNumber` of the if statement
 	lineNumber ++;
 	lineNumbers.push_back(lineNumber);
-	while ((lineNumber < code.size()) && (!flag)) {
-		vector<string> line = code.at(lineNumber);
+
+	// Loops through the code to find the else and endif clauses
+	// Also appends lines of code to `ifcode` and `elsecode`
+	while ((lineNumber < code.size()) && (!endifStatement)) {
+		vector<string> rawLine = code.at(lineNumber); // Tokenized line without filtering
+		vector<string> line; // Tokenized line
+
+		// Filter the rawLine for blank characters
+		for (string token : rawLine) {
+			token = helperfunctions::strip(token);
+			if (!token.empty()) {
+				line.push_back(token);
+			}
+		}
+		delete &rawLine;
+
+		// If the line is an else statement raise `elseStatment` and push `lineNumber` to `lineNumbers`
 		if (line.front() == "else" && line.back() == inputCore.stack.at(1)) {
 			elseStatement = true;
 			lineNumbers.push_back(lineNumber+1);
 		}
+		// If the line is an endif statment raise `endifStatement` and push `lineNumber` to `lineNumbers`
 		else if (line.front() == "endif" && line.back() == inputCore.stack.at(1)) {
-			flag = true;
+			endifStatement = true;
 			lineNumbers.push_back(lineNumber+1);
 		}
+		// Push the line of code to `ifCode` or `elsecode`
 		else {
 			if (!elseStatement) {
 				ifcode.push_back(line);
@@ -582,16 +634,23 @@ core ifStatement(vector<vector<string>> code, int lineNumber, core inputCore) {
 		}
 		lineNumber ++;
 	}
-	if (!flag) {
+	// Raise an error if the endifStatement is not found
+	if (!endifStatement) {
 		cout << "End if statement not found!";
 		abort();
 	}
+	// Run the if statement if the if statement is true
 	else if (inputCore.stack.at(2) == "True") {
 		inputCore = execute(ifcode, inputCore, lineNumbers.front());
 	}
+	// Run the else statement if the if statement is false
 	else if (elseStatement) {
 		inputCore = execute(elsecode, inputCore, lineNumbers.at(1));
 	}
+	// Tell the code to jump to the endif
+	/////////////////////////////////////////////////////
+	// TODO: MODIFY TO ALIGN WITH NEW JUMP METHODOLOGY //
+	/////////////////////////////////////////////////////
 	inputCore.returnString = to_string(lineNumbers.back());
 	return inputCore;
 }
